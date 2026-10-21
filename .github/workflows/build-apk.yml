@@ -30,6 +30,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+
       - name: Install Android SDK components
         run: |
           sdkmanager --install \
@@ -37,7 +40,6 @@ jobs:
             "build-tools;36.0.0" \
             "cmake;3.31.6" \
             "ndk;29.0.13113456"
-          yes | sdkmanager --licenses
 
       - name: Configure Kotlin JVM target
         working-directory: llama.cpp/examples/llama.android
