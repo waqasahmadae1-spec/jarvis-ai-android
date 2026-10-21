@@ -3,7 +3,8 @@ name: Build Native JARVIS AI APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -11,11 +12,16 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
-      - name: Checkout JARVIS repository
+      - name: Checkout JARVIS project
         uses: actions/checkout@v4
 
-      - name: Checkout official llama.cpp
+      - name: Checkout llama.cpp
         uses: actions/checkout@v4
         with:
           repository: ggml-org/llama.cpp
@@ -27,22 +33,17 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: 'latest'
-
-      - name: Accept Android SDK licenses
+      - name: Accept SDK licenses
         run: |
-          yes | sdkmanager --licenses || true
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
 
-      - name: Install Android SDK components
+      - name: Install Android SDK packages
         run: |
-          sdkmanager --install \
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-36" \
             "build-tools;36.0.0" \
             "cmake;3.31.6" \
-            "ndk;29.0.13113456"
+            "ndk;27.2.12479018"
 
       - name: Configure Kotlin JVM target
         working-directory: llama.cpp/examples/llama.android
@@ -58,7 +59,7 @@ jobs:
           }
           KOTLIN
 
-      - name: Build native debug APK
+      - name: Build native APK
         working-directory: llama.cpp/examples/llama.android
         run: |
           chmod +x gradlew
