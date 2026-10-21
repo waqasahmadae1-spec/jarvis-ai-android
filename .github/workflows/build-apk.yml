@@ -45,6 +45,22 @@ jobs:
             "cmake;3.31.6" \
             "ndk;27.2.12479018"
 
+      - name: Apply JARVIS custom UI and logo
+        run: |
+          APP=llama.cpp/examples/llama.android/app/src/main
+          cp -R native-overrides/app/src/main/java/. "$APP/java/"
+          cp -R native-overrides/app/src/main/res/. "$APP/res/"
+          python - <<'INNER'
+          from pathlib import Path
+          import re
+          p = Path("llama.cpp/examples/llama.android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          s = re.sub(r'android:icon="[^"]*"', 'android:icon="@drawable/ic_jarvis_logo"', s, count=1)
+          s = re.sub(r'android:roundIcon="[^"]*"', 'android:roundIcon="@drawable/ic_jarvis_logo"', s, count=1)
+          s = re.sub(r'android:label="[^"]*"', 'android:label="JARVIS AI"', s, count=1)
+          p.write_text(s)
+          INNER
+
       - name: Configure Kotlin JVM target
         working-directory: llama.cpp/examples/llama.android
         run: |
