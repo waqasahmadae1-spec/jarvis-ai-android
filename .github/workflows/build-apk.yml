@@ -1,16 +1,25 @@
-name: Build JARVIS AI APK
+name: Build Native JARVIS AI APK
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
+      - name: Checkout JARVIS repository
         uses: actions/checkout@v4
+
+      - name: Checkout official llama.cpp
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/llama.cpp
+          path: llama.cpp
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -18,16 +27,41 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Build debug APK
-        run: gradle assembleDebug
+      - name: Install Android SDK components
+        run: |
+          sdkmanager --install \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "cmake;3.31.6" \
+            "ndk;29.0.13113456"
+          yes | sdkmanager --licenses
 
-      - name: Upload APK
+      - name: Configure Kotlin JVM target
+        working-directory: llama.cpp/examples/llama.android
+        run: |
+          cat >> lib/build.gradle.kts <<'KOTLIN'
+
+          kotlin {
+              compilerOptions {
+                  jvmTarget.set(
+                      org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+                  )
+              }
+          }
+          KOTLIN
+
+      - name: Build native debug APK
+        working-directory: llama.cpp/examples/llama.android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace assembleDebug
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: JARVIS-AI-debug-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: JARVIS-Native-Debug-APK
+          path: llama.cpp/examples/llama.android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
