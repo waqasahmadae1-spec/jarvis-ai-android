@@ -29,9 +29,12 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 'latest'
 
       - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses
+        run: |
+          yes | sdkmanager --licenses || true
 
       - name: Install Android SDK components
         run: |
@@ -61,7 +64,7 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace assembleDebug
 
-      - name: Upload APK artifact
+      - name: Upload native APK
         uses: actions/upload-artifact@v4
         with:
           name: JARVIS-Native-Debug-APK
