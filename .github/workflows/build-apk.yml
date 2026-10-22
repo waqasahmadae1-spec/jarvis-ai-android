@@ -58,6 +58,11 @@ jobs:
           s = re.sub(r'android:icon="[^"]*"', 'android:icon="@drawable/ic_jarvis_logo"', s, count=1)
           s = re.sub(r'android:roundIcon="[^"]*"', 'android:roundIcon="@drawable/ic_jarvis_logo"', s, count=1)
           s = re.sub(r'android:label="[^"]*"', 'android:label="JARVIS AI"', s, count=1)
+          if "android.permission.RECORD_AUDIO" not in s:
+              match = re.search(r"<manifest\b[^>]*>", s)
+              if not match:
+                  raise SystemExit("Manifest opening tag not found")
+              s = s[:match.end()] + chr(10) + '    <uses-permission android:name="android.permission.RECORD_AUDIO" />' + s[match.end():]
           p.write_text(s)
           INNER
 

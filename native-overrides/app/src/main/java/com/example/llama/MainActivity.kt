@@ -1,8 +1,15 @@
 package com.example.llama
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.RecognitionListener
 import android.os.Bundle
 import android.util.Log
+import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
@@ -35,6 +42,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var messagesRv: RecyclerView
     private lateinit var userInputEt: EditText
     private lateinit var userActionFab: FloatingActionButton
+    private lateinit var micButton: Button
+    private var speechRecognizer: SpeechRecognizer? = null
+
+    private val audioPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                startVoiceRecognition()
+            } else {
+                Toast.makeText(this, "Microphone permission is required.", Toast.LENGTH_LONG).show()
+            }
+        }
 
     // Arm AI Chat inference engine
     private lateinit var engine: InferenceEngine
@@ -60,6 +78,8 @@ class MainActivity : AppCompatActivity() {
         messagesRv.adapter = messageAdapter
         userInputEt = findViewById(R.id.user_input)
         userActionFab = findViewById(R.id.fab)
+        micButton = findViewById(R.id.mic_button)
+        micButton.setOnClickListener { startVoiceInput() }
 
         // Initialize engine first, then restore the last successfully loaded model.
         userActionFab.isEnabled = false
@@ -208,6 +228,68 @@ class MainActivity : AppCompatActivity() {
     /**
      * Validate and send the user message into [InferenceEngine]
      */
+    private fun startVoiceInput() {
+        if (!isModelReady) {
+            Toast.makeText(this, "Please load a model first.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this, "Speech recognition is unavailable on this device.", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        startVoiceRecognition()
+    }
+
+    private fun startVoiceRecognition() {
+        try {
+            speechRecognizer?.destroy()
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).also { recognizer ->
+                recognizer.setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        micButton.text = "..."
+                    }
+                    override fun onBeginningOfSpeech() {}
+                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onEndOfSpeech() {
+                        micButton.text = "🎙"
+                    }
+                    override fun onError(error: Int) {
+                        micButton.text = "🎙"
+                        Toast.makeText(this@MainActivity, "Voice input failed. Please try again.", Toast.LENGTH_SHORT).show()
+                    }
+                    override fun onResults(results: Bundle?) {
+                        micButton.text = "🎙"
+                        val spokenText = results
+                            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                            ?.firstOrNull()
+                        if (!spokenText.isNullOrBlank()) {
+                            userInputEt.setText(spokenText)
+                            if (isModelReady) handleUserInput()
+                        }
+                    }
+                    override fun onPartialResults(partialResults: Bundle?) {}
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
+            }
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            }
+            micButton.text = "..."
+            speechRecognizer?.startListening(intent)
+        } catch (e: Exception) {
+            micButton.text = "🎙"
+            Log.e(TAG, "Voice recognition could not start", e)
+            Toast.makeText(this, "Could not start voice input.", Toast.LENGTH_LONG).show()
+        }
+    }
+
     private fun handleUserInput() {
         userInputEt.text.toString().also { userMsg ->
             if (userMsg.isEmpty()) {
@@ -284,6 +366,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        speechRecognizer?.destroy()
+        speechRecognizer = null
         if (this::engine.isInitialized) engine.destroy()
         super.onDestroy()
     }

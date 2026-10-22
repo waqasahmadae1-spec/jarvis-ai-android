@@ -148,6 +148,16 @@
                 android:textColorHint="#7890AF"
                 android:textSize="15sp" />
 
+            <Button
+                android:id="@+id/mic_button"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="6dp"
+                android:backgroundTint="#123A58"
+                android:text="🎙"
+                android:textColor="#FFFFFF"
+                android:contentDescription="Speak to JARVIS" />
+
             <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/fab"
                 android:layout_width="56dp"
