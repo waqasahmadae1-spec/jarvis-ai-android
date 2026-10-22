@@ -290,10 +290,43 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun handlePhoneCommand(command: String): Boolean {
+        val text = command.trim().lowercase(java.util.Locale.ROOT)
+
+        val target = when {
+            text in listOf("open youtube", "launch youtube", "start youtube") ->
+                "com.google.android.youtube"
+            text in listOf("open chrome", "launch chrome", "start chrome") ->
+                "com.android.chrome"
+            else -> return false
+        }
+
+        val launchIntent = packageManager.getLaunchIntentForPackage(target)
+
+        if (launchIntent == null) {
+            Toast.makeText(
+                this,
+                "That app is not installed or cannot be opened.",
+                Toast.LENGTH_LONG
+            ).show()
+        } else {
+            try {
+                startActivity(launchIntent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Could not open app: $target", e)
+                Toast.makeText(this, "Could not open that app.", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        return true
+    }
+
     private fun handleUserInput() {
         userInputEt.text.toString().also { userMsg ->
             if (userMsg.isEmpty()) {
                 Toast.makeText(this, "Input message is empty!", Toast.LENGTH_SHORT).show()
+            } else if (handlePhoneCommand(userMsg)) {
+                userInputEt.text = null
             } else {
                 userInputEt.text = null
                 userInputEt.isEnabled = false
