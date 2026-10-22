@@ -292,32 +292,41 @@ class MainActivity : AppCompatActivity() {
 
     private fun handlePhoneCommand(command: String): Boolean {
         val text = command.trim().lowercase(java.util.Locale.ROOT)
-
         val target = when {
-            text in listOf("open youtube", "launch youtube", "start youtube") ->
-                "com.google.android.youtube"
-            text in listOf("open chrome", "launch chrome", "start chrome") ->
-                "com.android.chrome"
+            text.matches(Regex("(please )?(open|launch|start)( the)? youtube(app)?[.! ]*")) ->
+                "youtube"
+            text.matches(Regex("(please )?(open|launch|start)( the)? chrome(app)?[.! ]*")) ->
+                "chrome"
+            text.matches(Regex("(please )?(open|search|go to)( google| google.com)?[.! ]*")) ||
+                text == "google" || text == "open google.com" ->
+                "google"
             else -> return false
         }
 
-        val launchIntent = packageManager.getLaunchIntentForPackage(target)
-
-        if (launchIntent == null) {
-            Toast.makeText(
-                this,
-                "That app is not installed or cannot be opened.",
-                Toast.LENGTH_LONG
-            ).show()
-        } else {
-            try {
-                startActivity(launchIntent)
-            } catch (e: Exception) {
-                Log.e(TAG, "Could not open app: $target", e)
-                Toast.makeText(this, "Could not open that app.", Toast.LENGTH_LONG).show()
+        try {
+            if (target == "chrome" || target == "youtube") {
+                val pkg = if (target == "chrome") {
+                    "com.android.chrome"
+                } else {
+                    "com.google.android.youtube"
+                }
+                val launch = packageManager.getLaunchIntentForPackage(pkg)
+                if (launch != null) {
+                    startActivity(launch)
+                    return true
+                }
             }
-        }
 
+            val url = when (target) {
+                "youtube" -> "https://www.youtube.com"
+                "google" -> "https://www.google.com"
+                else -> "https://www.google.com"
+            }
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not open $target", e)
+            Toast.makeText(this, "Could not open $target.", Toast.LENGTH_SHORT).show()
+        }
         return true
     }
 

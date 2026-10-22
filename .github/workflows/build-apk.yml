@@ -58,6 +58,15 @@ jobs:
           s = re.sub(r'android:icon="[^"]*"', 'android:icon="@drawable/ic_jarvis_logo"', s, count=1)
           s = re.sub(r'android:roundIcon="[^"]*"', 'android:roundIcon="@drawable/ic_jarvis_logo"', s, count=1)
           s = re.sub(r'android:label="[^"]*"', 'android:label="JARVIS AI"', s, count=1)
+          if "<queries>" not in s:
+              match = re.search(r"<manifest\b[^>]*>", s)
+              if not match:
+                  raise SystemExit("Manifest opening tag not found for queries")
+              queries = """\n    <queries>
+                <package android:name="com.google.android.youtube" />
+                <package android:name="com.android.chrome" />
+              </queries>"""
+              s = s[:match.end()] + queries + s[match.end():]
           if "android.permission.RECORD_AUDIO" not in s:
               match = re.search(r"<manifest\b[^>]*>", s)
               if not match:
