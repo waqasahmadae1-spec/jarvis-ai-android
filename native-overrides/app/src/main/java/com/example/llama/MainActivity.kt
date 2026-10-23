@@ -44,7 +44,7 @@ class MainActivity : AppCompatActivity() {
 
     private val wakePermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) startWakeWordListener()
+            android.util.Log.i("JARVIS-DIAG", "Microphone permission result: $granted; wake-word auto-start disabled for diagnosis.")
         }
 
 
@@ -96,10 +96,10 @@ class MainActivity : AppCompatActivity() {
             if (wakeTtsReady) wakeWordTts?.language = java.util.Locale.US
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            == PackageManager.PERMISSION_GRANTED) {
-            startWakeWordListener()
-        } else {
+            != PackageManager.PERMISSION_GRANTED) {
             wakePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        } else {
+            android.util.Log.i("JARVIS-DIAG", "Microphone permission already granted; wake-word auto-start disabled for diagnosis.")
         }
         micButton.setOnClickListener { startVoiceInput() }
 
