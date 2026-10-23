@@ -1,5 +1,7 @@
 package com.example.llama
 
+import androidx.core.content.ContextCompat
+import android.speech.tts.TextToSpeech
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -36,6 +38,15 @@ import java.io.InputStream
 import java.util.UUID
 
 class MainActivity : AppCompatActivity() {
+    private var wakeWordManager: WakeWordManager? = null
+    private var wakeWordTts: TextToSpeech? = null
+    private var wakeTtsReady = false
+
+    private val wakePermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) startWakeWordListener()
+        }
+
 
     // Android views
     private lateinit var ggufTv: TextView
@@ -79,6 +90,17 @@ class MainActivity : AppCompatActivity() {
         userInputEt = findViewById(R.id.user_input)
         userActionFab = findViewById(R.id.fab)
         micButton = findViewById(R.id.mic_button)
+
+        wakeWordTts = TextToSpeech(this) { status ->
+            wakeTtsReady = status == TextToSpeech.SUCCESS
+            if (wakeTtsReady) wakeWordTts?.language = java.util.Locale.US
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            == PackageManager.PERMISSION_GRANTED) {
+            startWakeWordListener()
+        } else {
+            wakePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
         micButton.setOnClickListener { startVoiceInput() }
 
         // Initialize engine first, then restore the last successfully loaded model.
@@ -407,7 +429,43 @@ class MainActivity : AppCompatActivity() {
         super.onStop()
     }
 
+
+    private fun startWakeWordListener() {
+        if (wakeWordManager != null) return
+        wakeWordManager = WakeWordManager(
+            context = this,
+            onWakeWord = {
+                runOnUiThread {
+                    val speakAndListen = {
+                        micButton.performClick()
+                    }
+                    if (wakeTtsReady && wakeWordTts != null) {
+                        wakeWordTts?.speak(
+                            "Yes, sir. What's the new order?",
+                            TextToSpeech.QUEUE_FLUSH,
+                            null,
+                            "jarvis_wake_ack"
+                        )
+                        android.os.Handler(mainLooper).postDelayed(speakAndListen, 1600)
+                    } else {
+                        speakAndListen()
+                    }
+                }
+            },
+            onError = { message ->
+                android.util.Log.e("JARVIS-WakeWord", message)
+            }
+        )
+        wakeWordManager?.start()
+    }
+
     override fun onDestroy() {
+        wakeWordManager?.stop()
+        wakeWordManager = null
+        wakeWordTts?.stop()
+        wakeWordTts?.shutdown()
+        wakeWordTts = null
+
         speechRecognizer?.destroy()
         speechRecognizer = null
         if (this::engine.isInitialized) engine.destroy()
