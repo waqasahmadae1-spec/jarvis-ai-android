@@ -50,6 +50,9 @@ jobs:
           APP=llama.cpp/examples/llama.android/app/src/main
           cp -R native-overrides/app/src/main/java/. "$APP/java/"
           cp -R native-overrides/app/src/main/res/. "$APP/res/"
+          mkdir -p "$APP/assets" "$APP/jniLibs"
+          cp -R native-overrides/app/src/main/assets/. "$APP/assets/"
+          cp -R native-overrides/app/src/main/jniLibs/. "$APP/jniLibs/"
           python - <<'INNER'
           from pathlib import Path
           import re

@@ -446,7 +446,7 @@ class MainActivity : AppCompatActivity() {
                             null,
                             "jarvis_wake_ack"
                         )
-                        android.os.Handler(mainLooper).postDelayed(speakAndListen, 1600)
+                        android.os.Handler(mainLooper).postDelayed({ speakAndListen(); Unit }, 1600)
                     } else {
                         speakAndListen()
                     }
