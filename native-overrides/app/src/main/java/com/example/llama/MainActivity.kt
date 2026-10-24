@@ -119,6 +119,12 @@ class MainActivity : AppCompatActivity() {
                         userInputEt.hint = "Loading your saved model..."
                     }
                     engine.loadModel(savedFile.absolutePath)
+                    engine.setSystemPrompt(
+                        "You are JARVIS, a helpful AI assistant. Always answer in clear English. " +
+                        "Be accurate, direct, and concise. For simple questions, use 1-4 short sentences. " +
+                        "Do not repeat the question or add unnecessary introductions. " +
+                        "If uncertain, say so instead of inventing facts."
+                    )
                     withContext(Dispatchers.Main) {
                         isModelReady = true
                         ggufTv.text = "Model ready • ${savedFile.name}"
@@ -241,6 +247,12 @@ class MainActivity : AppCompatActivity() {
                 userInputEt.hint = "Loading model..."
             }
             engine.loadModel(modelFile.absolutePath)
+            engine.setSystemPrompt(
+                "You are JARVIS, a helpful AI assistant. Always answer in clear English. " +
+                "Be accurate, direct, and concise. For simple questions, use 1-4 short sentences. " +
+                "Do not repeat the question or add unnecessary introductions. " +
+                "If uncertain, say so instead of inventing facts."
+            )
             getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                 .edit()
                 .putString(PREF_MODEL_NAME, modelName)
@@ -369,7 +381,7 @@ class MainActivity : AppCompatActivity() {
                 messages.add(Message(UUID.randomUUID().toString(), lastAssistantMsg.toString(), false))
 
                 generationJob = lifecycleScope.launch(Dispatchers.Default) {
-                    engine.sendUserPrompt(userMsg)
+                    engine.sendUserPrompt(userMsg, predictLength = 192)
                         .onCompletion {
                             withContext(Dispatchers.Main) {
                                 userInputEt.isEnabled = true
