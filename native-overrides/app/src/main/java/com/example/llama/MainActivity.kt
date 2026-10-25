@@ -107,18 +107,27 @@ class MainActivity : AppCompatActivity() {
         userActionFab.isEnabled = false
         lifecycleScope.launch(Dispatchers.IO) {
             try {
+                Log.i("JARVIS-DIAG", "Starting inference engine initialization")
                 engine = AiChat.getInferenceEngine(applicationContext)
+                Log.i("JARVIS-DIAG", "Inference engine initialized")
 
                 val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                 val savedName = prefs.getString(PREF_MODEL_NAME, null)
                 val savedFile = savedName?.let { File(ensureModelsDirectory(), it) }
 
                 if (savedFile != null && savedFile.isFile && savedFile.length() > 0L) {
+                    Log.i(
+                        "JARVIS-DIAG",
+                        "Saved model found: ${savedFile.name}, size=${savedFile.length()} bytes"
+                    )
                     withContext(Dispatchers.Main) {
                         ggufTv.text = "JARVIS AI • Loading saved model..."
-                        userInputEt.hint = "Loading your saved model..."
+                        userInputEt.hint = "Loading saved model; large models may take a few minutes..."
+                        userInputEt.isEnabled = false
                     }
+                    Log.i("JARVIS-DIAG", "Calling loadModel")
                     engine.loadModel(savedFile.absolutePath)
+                    Log.i("JARVIS-DIAG", "loadModel returned successfully")
                     engine.setSystemPrompt(
                         "You are JARVIS, a helpful AI assistant. Always answer in clear English. " +
                         "Be accurate, direct, and concise. For simple questions, use 1-4 short sentences. " +
@@ -142,6 +151,7 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Engine initialization or model restore failed", e)
+                Log.e("JARVIS-DIAG", "Restore failure: ${e.javaClass.simpleName}: ${e.message}")
                 withContext(Dispatchers.Main) {
                     isModelReady = false
                     ggufTv.text = "JARVIS AI • Model not loaded"
@@ -384,19 +394,39 @@ class MainActivity : AppCompatActivity() {
                     engine.sendUserPrompt(userMsg, predictLength = 192)
                         .onCompletion {
                             withContext(Dispatchers.Main) {
+                                val raw = lastAssistantMsg.toString()
+                                val cleaned = Regex(
+                                    "<think>.*?</think>",
+                                    RegexOption.IGNORE_CASE or RegexOption.DOT_MATCHES_ALL
+                                ).replace(raw, "").substringBefore("<think>").trim()
+
+                                val finalText = if (cleaned.isNotBlank()) cleaned
+                                    else "I couldn't generate a clear answer. Please try again."
+
+                                val index = messages.lastIndex
+                                if (index >= 0 && !messages[index].isUser) {
+                                    messages[index] = messages[index].copy(content = finalText)
+                                    messageAdapter.notifyItemChanged(index)
+                                }
                                 userInputEt.isEnabled = true
                                 userActionFab.isEnabled = true
                             }
                         }.collect { token ->
+                            lastAssistantMsg.append(token)
+                            val raw = lastAssistantMsg.toString()
+                            val thinkPattern = Regex(
+                                "<think>.*?</think>",
+                                RegexOption.IGNORE_CASE or RegexOption.DOT_MATCHES_ALL
+                            )
+                            val cleaned = thinkPattern.replace(raw, "")
+                                .substringBefore("<think>").trimStart()
+
                             withContext(Dispatchers.Main) {
-                                val messageCount = messages.size
-                                check(messageCount > 0 && !messages[messageCount - 1].isUser)
-
-                                messages.removeAt(messageCount - 1).copy(
-                                    content = lastAssistantMsg.append(token).toString()
-                                ).let { messages.add(it) }
-
-                                messageAdapter.notifyItemChanged(messages.size - 1)
+                                val index = messages.lastIndex
+                                if (index >= 0 && !messages[index].isUser) {
+                                    messages[index] = messages[index].copy(content = cleaned)
+                                    messageAdapter.notifyItemChanged(index)
+                                }
                             }
                         }
                 }
