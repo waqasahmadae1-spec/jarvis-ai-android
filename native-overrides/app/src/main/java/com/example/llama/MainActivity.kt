@@ -397,7 +397,7 @@ class MainActivity : AppCompatActivity() {
                                 val raw = lastAssistantMsg.toString()
                                 val cleaned = Regex(
                                     "<think>.*?</think>",
-                                    RegexOption.IGNORE_CASE or RegexOption.DOT_MATCHES_ALL
+                                    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
                                 ).replace(raw, "").substringBefore("<think>").trim()
 
                                 val finalText = if (cleaned.isNotBlank()) cleaned
@@ -416,7 +416,7 @@ class MainActivity : AppCompatActivity() {
                             val raw = lastAssistantMsg.toString()
                             val thinkPattern = Regex(
                                 "<think>.*?</think>",
-                                RegexOption.IGNORE_CASE or RegexOption.DOT_MATCHES_ALL
+                                setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
                             )
                             val cleaned = thinkPattern.replace(raw, "")
                                 .substringBefore("<think>").trimStart()
