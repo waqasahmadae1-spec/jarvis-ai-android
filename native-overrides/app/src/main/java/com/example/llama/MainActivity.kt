@@ -103,80 +103,56 @@ class MainActivity : AppCompatActivity() {
         }
         micButton.setOnClickListener { startVoiceInput() }
 
-        // Initialize engine first, then restore the last successfully loaded model.
-        userActionFab.isEnabled = false
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                Log.i("JARVIS-DIAG", "Starting inference engine initialization")
-                engine = AiChat.getInferenceEngine(applicationContext)
-                Log.i("JARVIS-DIAG", "Inference engine initialized")
+        // Configure cloud AI; no local GGUF model is loaded at startup.
+        configureCloudAi()
 
-                val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                val savedName = prefs.getString(PREF_MODEL_NAME, null)
-                val savedFile = savedName?.let { File(ensureModelsDirectory(), it) }
-
-                if (savedFile != null && savedFile.isFile && savedFile.length() > 0L) {
-                    Log.i(
-                        "JARVIS-DIAG",
-                        "Saved model found: ${savedFile.name}, size=${savedFile.length()} bytes"
-                    )
-                    withContext(Dispatchers.Main) {
-                        ggufTv.text = "JARVIS AI • Loading saved model..."
-                        userInputEt.hint = "Loading saved model; large models may take a few minutes..."
-                        userInputEt.isEnabled = false
-                    }
-                    Log.i("JARVIS-DIAG", "Calling loadModel")
-                    engine.loadModel(savedFile.absolutePath)
-                    Log.i("JARVIS-DIAG", "loadModel returned successfully")
-                    engine.setSystemPrompt(
-                        "You are JARVIS, a helpful AI assistant. Always answer in clear English. " +
-                        "Be accurate, direct, and concise. For simple questions, use 1-4 short sentences. " +
-                        "Do not repeat the question or add unnecessary introductions. " +
-                        "If uncertain, say so instead of inventing facts."
-                    )
-                    withContext(Dispatchers.Main) {
-                        isModelReady = true
-                        ggufTv.text = "Model ready • ${savedFile.name}"
-                        userInputEt.hint = "Message JARVIS..."
-                        userInputEt.isEnabled = true
-                        userActionFab.setImageResource(R.drawable.outline_send_24)
-                        userActionFab.isEnabled = true
-                    }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        ggufTv.text = "JARVIS AI • Select a GGUF model"
-                        userInputEt.hint = "Tap the button to import a GGUF model"
-                        userActionFab.isEnabled = true
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Engine initialization or model restore failed", e)
-                Log.e("JARVIS-DIAG", "Restore failure: ${e.javaClass.simpleName}: ${e.message}")
-                withContext(Dispatchers.Main) {
-                    isModelReady = false
-                    ggufTv.text = "JARVIS AI • Model not loaded"
-                    userInputEt.hint = "Tap to select your GGUF model"
-                    userInputEt.isEnabled = false
-                    userActionFab.isEnabled = true
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Could not load model. Please select it again.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-        }
-
-        // Upon CTA button tapped
+        // Send a message, or open cloud setup if no API key is configured.
         userActionFab.setOnClickListener {
-            if (isModelReady) {
-                // If model is ready, validate input and send to engine
-                handleUserInput()
-            } else {
-                // Otherwise, prompt user to select a GGUF metadata on the device
-                getContent.launch(arrayOf("*/*"))
-            }
+            if (isModelReady) handleUserInput() else showApiKeyDialog()
         }
+    }
+
+    private fun configureCloudAi() {
+        val key = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getString("OPENROUTER_API_KEY", null)
+        isModelReady = !key.isNullOrBlank()
+        userInputEt.isEnabled = isModelReady
+        userActionFab.isEnabled = true
+        ggufTv.text = if (isModelReady) "JARVIS AI • Cloud ready" else "JARVIS AI • Cloud setup required"
+        userInputEt.hint = if (isModelReady) "Message JARVIS..." else "Set up your cloud API key"
+        if (!isModelReady) showApiKeyDialog()
+    }
+
+    private fun showApiKeyDialog() {
+        val field = android.widget.EditText(this).apply {
+            hint = "OpenRouter API key"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setText(getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .getString("OPENROUTER_API_KEY", ""))
+        }
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Set up JARVIS Cloud AI")
+            .setMessage("Enter your OpenRouter API key. The key is stored on this device, not in the GitHub repository.")
+            .setView(field)
+            .setPositiveButton("Save") { _, _ ->
+                val key = field.text.toString().trim()
+                if (!key.startsWith("sk-or-") || key.length < 20) {
+                    Toast.makeText(this, "Please enter a valid OpenRouter API key.", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+                    .putString("OPENROUTER_API_KEY", key).apply()
+                isModelReady = true
+                ggufTv.text = "JARVIS AI • Cloud ready"
+                userInputEt.hint = "Message JARVIS..."
+                userInputEt.isEnabled = true
+                userActionFab.isEnabled = true
+                Toast.makeText(this, "Cloud AI configured.", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private val getContent = registerForActivityResult(
@@ -375,61 +351,56 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleUserInput() {
-        userInputEt.text.toString().also { userMsg ->
-            if (userMsg.isEmpty()) {
-                Toast.makeText(this, "Input message is empty!", Toast.LENGTH_SHORT).show()
-            } else if (handlePhoneCommand(userMsg)) {
-                userInputEt.text = null
-            } else {
-                userInputEt.text = null
-                userInputEt.isEnabled = false
-                userActionFab.isEnabled = false
+        val userMsg = userInputEt.text.toString().trim()
+        if (userMsg.isEmpty()) {
+            Toast.makeText(this, "Input message is empty!", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (handlePhoneCommand(userMsg)) {
+            userInputEt.text = null
+            return
+        }
 
-                // Update message states
-                messages.add(Message(UUID.randomUUID().toString(), userMsg, true))
-                lastAssistantMsg.clear()
-                messages.add(Message(UUID.randomUUID().toString(), lastAssistantMsg.toString(), false))
+        val apiKey = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getString("OPENROUTER_API_KEY", null)
+        if (apiKey.isNullOrBlank()) {
+            isModelReady = false
+            showApiKeyDialog()
+            return
+        }
 
-                generationJob = lifecycleScope.launch(Dispatchers.Default) {
-                    engine.sendUserPrompt(userMsg, predictLength = 192)
-                        .onCompletion {
-                            withContext(Dispatchers.Main) {
-                                val raw = lastAssistantMsg.toString()
-                                val cleaned = Regex(
-                                    "<think>.*?</think>",
-                                    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
-                                ).replace(raw, "").substringBefore("<think>").trim()
+        userInputEt.text = null
+        userInputEt.isEnabled = false
+        userActionFab.isEnabled = false
 
-                                val finalText = if (cleaned.isNotBlank()) cleaned
-                                    else "I couldn't generate a clear answer. Please try again."
+        messages.add(Message(UUID.randomUUID().toString(), userMsg, true))
+        val assistantId = UUID.randomUUID().toString()
+        messages.add(Message(assistantId, "Thinking...", false))
+        messageAdapter.notifyDataSetChanged()
 
-                                val index = messages.lastIndex
-                                if (index >= 0 && !messages[index].isUser) {
-                                    messages[index] = messages[index].copy(content = finalText)
-                                    messageAdapter.notifyItemChanged(index)
-                                }
-                                userInputEt.isEnabled = true
-                                userActionFab.isEnabled = true
-                            }
-                        }.collect { token ->
-                            lastAssistantMsg.append(token)
-                            val raw = lastAssistantMsg.toString()
-                            val thinkPattern = Regex(
-                                "<think>.*?</think>",
-                                setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
-                            )
-                            val cleaned = thinkPattern.replace(raw, "")
-                                .substringBefore("<think>").trimStart()
+        val history = messages.dropLast(1).takeLast(12).mapNotNull { message ->
+            val content = message.content.trim()
+            if (content.isBlank()) null
+            else Pair(if (message.isUser) "user" else "assistant", content)
+        }
 
-                            withContext(Dispatchers.Main) {
-                                val index = messages.lastIndex
-                                if (index >= 0 && !messages[index].isUser) {
-                                    messages[index] = messages[index].copy(content = cleaned)
-                                    messageAdapter.notifyItemChanged(index)
-                                }
-                            }
-                        }
+        generationJob = lifecycleScope.launch(Dispatchers.IO) {
+            val answer = try {
+                CloudAiClient.reply(apiKey, history)
+            } catch (e: Exception) {
+                Log.e(TAG, "Cloud AI request failed", e)
+                "Cloud AI error: ${e.message ?: "Connection failed"}. Check your internet and API key, then try again."
+            }
+
+            withContext(Dispatchers.Main) {
+                val index = messages.indexOfLast { it.id == assistantId }
+                if (index >= 0) {
+                    messages[index] = messages[index].copy(content = answer)
+                    messageAdapter.notifyItemChanged(index)
                 }
+                userInputEt.isEnabled = true
+                userActionFab.isEnabled = true
+                userInputEt.requestFocus()
             }
         }
     }
