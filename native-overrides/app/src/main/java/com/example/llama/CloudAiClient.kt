@@ -21,7 +21,7 @@ object CloudAiClient {
             .put("model", "openrouter/free")
             .put("messages", messages)
             .put("temperature", 0.2)
-            .put("max_tokens", 400)
+            .put("max_tokens", 800)
 
         val connection = (URL("https://openrouter.ai/api/v1/chat/completions")
             .openConnection() as HttpURLConnection).apply {
