@@ -368,6 +368,39 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // Keep JARVIS application identity separate from its underlying AI model.
+        val normalizedQuestion = userMsg.lowercase()
+            .replace(Regex("[^a-z0-9 ]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
+        val identityPhrases = listOf(
+            "who created you",
+            "who made you",
+            "who built you",
+            "who developed you",
+            "who is your creator",
+            "who is your developer",
+            "who created jarvis",
+            "who made jarvis",
+            "who developed jarvis",
+            "are you created by nvidia",
+            "did nvidia create you",
+            "is nvidia your creator"
+        )
+
+        if (identityPhrases.any { normalizedQuestion.contains(it) }) {
+            val identityAnswer = "I am JARVIS AI, created by Waqas Ahmad. " +
+                "I use NVIDIA Nemotron 3 Ultra as my underlying AI model. " +
+                "NVIDIA developed the model, not the JARVIS application."
+
+            userInputEt.text = null
+            messages.add(Message(UUID.randomUUID().toString(), userMsg, true))
+            messages.add(Message(UUID.randomUUID().toString(), identityAnswer, false))
+            messageAdapter.notifyDataSetChanged()
+            return
+        }
+
         val apiKey = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
             .getString("OPENROUTER_API_KEY", null)
         if (apiKey.isNullOrBlank()) {
