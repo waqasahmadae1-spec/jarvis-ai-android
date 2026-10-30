@@ -83,6 +83,37 @@ jobs:
           p.write_text(s)
           INNER
 
+      - name: Set separate JARVIS application ID
+        working-directory: llama.cpp/examples/llama.android
+        run: |
+          python - <<'INNER'
+          from pathlib import Path
+          import re
+
+          candidates = [
+              Path("app/build.gradle.kts"),
+              Path("app/build.gradle"),
+          ]
+
+          for p in candidates:
+              if not p.exists():
+                  continue
+              s = p.read_text()
+              pattern = r'(?m)^(\s*applicationId\s*(?:=\s*)?)(["\x27])[^"\x27]+\2'
+              updated, count = re.subn(
+                  pattern,
+                  lambda m: m.group(1) + '"com.jarvis.ai.new"',
+                  s,
+                  count=1
+              )
+              if count:
+                  p.write_text(updated)
+                  print("Updated actual APK package in:", p)
+                  break
+          else:
+              raise SystemExit("ERROR: Could not find applicationId in actual Android app Gradle file.")
+          INNER
+
       - name: Configure Kotlin JVM target
         working-directory: llama.cpp/examples/llama.android
         run: |
