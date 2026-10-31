@@ -102,13 +102,34 @@ jobs:
               pattern = r'(?m)^(\s*applicationId\s*(?:=\s*)?)(["\x27])[^"\x27]+\2'
               updated, count = re.subn(
                   pattern,
-                  lambda m: m.group(1) + '"com.jarvis.ai.new"',
+                  lambda m: m.group(1) + '"com.jarvis.ai"',
                   s,
                   count=1
               )
               if count:
+                  signing = """
+    signingConfigs {
+        create("jarvis") {
+            storeFile = file(System.getenv("JARVIS_KEYSTORE_FILE"))
+            storePassword = System.getenv("JARVIS_STORE_PASSWORD")
+            keyAlias = System.getenv("JARVIS_KEY_ALIAS")
+            keyPassword = System.getenv("JARVIS_KEY_PASSWORD")
+        }
+    }
+"""
+                  if "signingConfigs {" not in updated:
+                      updated = updated.replace(
+                          "    buildTypes {",
+                          signing + "\n    buildTypes {",
+                          1
+                      )
+                  updated = updated.replace(
+                      "        debug {",
+                      '        debug {\n            signingConfig = signingConfigs.getByName("jarvis")',
+                      1
+                  )
                   p.write_text(updated)
-                  print("Updated actual APK package in:", p)
+                  print("Updated package ID and signing config in:", p)
                   break
           else:
               raise SystemExit("ERROR: Could not find applicationId in actual Android app Gradle file.")
@@ -128,8 +149,21 @@ jobs:
           }
           KOTLIN
 
+      - name: Restore JARVIS signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.JARVIS_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/jarvis-debug.keystore"
+          test -s "$RUNNER_TEMP/jarvis-debug.keystore"
+
       - name: Build native APK
         working-directory: llama.cpp/examples/llama.android
+        env:
+          JARVIS_KEYSTORE_FILE: ${{ runner.temp }}/jarvis-debug.keystore
+          JARVIS_STORE_PASSWORD: ${{ secrets.JARVIS_STORE_PASSWORD }}
+          JARVIS_KEY_ALIAS: ${{ secrets.JARVIS_KEY_ALIAS }}
+          JARVIS_KEY_PASSWORD: ${{ secrets.JARVIS_KEY_PASSWORD }}
         run: |
           set -o pipefail
           chmod +x gradlew
