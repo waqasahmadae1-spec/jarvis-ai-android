@@ -143,10 +143,19 @@ jobs:
       - name: Restore JARVIS signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.JARVIS_KEYSTORE_BASE64 }}
+          JARVIS_STORE_PASSWORD: ${{ secrets.JARVIS_STORE_PASSWORD }}
+          JARVIS_KEY_ALIAS: ${{ secrets.JARVIS_KEY_ALIAS }}
+          JARVIS_KEY_PASSWORD: ${{ secrets.JARVIS_KEY_PASSWORD }}
         run: |
-          test -n "$KEYSTORE_BASE64"
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/jarvis-debug.keystore"
-          test -s "$RUNNER_TEMP/jarvis-debug.keystore"
+          set -euo pipefail
+          test -n "$KEYSTORE_BASE64" || { echo "ERROR: JARVIS_KEYSTORE_BASE64 secret is missing"; exit 1; }
+          test -n "$JARVIS_STORE_PASSWORD" || { echo "ERROR: JARVIS_STORE_PASSWORD secret is missing"; exit 1; }
+          test -n "$JARVIS_KEY_ALIAS" || { echo "ERROR: JARVIS_KEY_ALIAS secret is missing"; exit 1; }
+          test -n "$JARVIS_KEY_PASSWORD" || { echo "ERROR: JARVIS_KEY_PASSWORD secret is missing"; exit 1; }
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/jarvis-debug.keystore" || { echo "ERROR: Keystore Base64 decoding failed"; exit 1; }
+          test -s "$RUNNER_TEMP/jarvis-debug.keystore" || { echo "ERROR: Keystore file is empty"; exit 1; }
+          keytool -list -keystore "$RUNNER_TEMP/jarvis-debug.keystore" -storepass "$JARVIS_STORE_PASSWORD" -alias "$JARVIS_KEY_ALIAS" > /dev/null || { echo "ERROR: Keystore invalid, password incorrect, or alias not found"; exit 1; }
+          echo "SUCCESS: JARVIS signing keystore verified"
 
       - name: Build native APK
         working-directory: llama.cpp/examples/llama.android
