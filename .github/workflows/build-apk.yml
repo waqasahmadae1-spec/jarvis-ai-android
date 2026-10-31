@@ -107,16 +107,7 @@ jobs:
                   count=1
               )
               if count:
-                  signing = """
-    signingConfigs {
-        create("jarvis") {
-            storeFile = file(System.getenv("JARVIS_KEYSTORE_FILE"))
-            storePassword = System.getenv("JARVIS_STORE_PASSWORD")
-            keyAlias = System.getenv("JARVIS_KEY_ALIAS")
-            keyPassword = System.getenv("JARVIS_KEY_PASSWORD")
-        }
-    }
-"""
+                  signing = "\n    signingConfigs {\n        create(\"jarvis\") {\n            storeFile = file(System.getenv(\"JARVIS_KEYSTORE_FILE\"))\n            storePassword = System.getenv(\"JARVIS_STORE_PASSWORD\")\n            keyAlias = System.getenv(\"JARVIS_KEY_ALIAS\")\n            keyPassword = System.getenv(\"JARVIS_KEY_PASSWORD\")\n        }\n    }\n"
                   if "signingConfigs {" not in updated:
                       updated = updated.replace(
                           "    buildTypes {",
